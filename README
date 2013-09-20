@@ -1,0 +1,54 @@
+1. Distance Vector Router
+2. General architecture:
+   We use the general framework of Distance vector routing to simulate the router.
+   We keep a TCP conection to the manager on each router. We keep a open UDP listener socket on each of the router.
+   We employ a state-machine kind of architecture to deal with the message converstion with the manager.
+   We employ switch case based architecture to react to the UDP messages like route updates or data packets, that are either
+      sent to the router itself or need to be forwarded.
+   Both TCP and UDP sockets are a part of a polling array, which form the event loop for the program. We thus listen to events 
+   on sockets in order and do not use threading.
+   We do not use any timers. The routing is trigger based.
+   We use two tables, 1. Router table 2. Link Table to maintain the information base
+   There are also a few state variables to keep track of the state machine.
+   
+3. Protocol implementation:  
+   Router Table: 
+   This table is filled when the manager gives the information about the neighbors.
+   When a new update for a reachable address comes, we add into the table in a sorted manner directly.
+   We also, each time insert a link entry update from the link table if the address happens to be a directly 
+   connected address.
+   We then run a duplicate removal algorithm which removes the duplicates in terms of recheable address,
+   keeping in mind the cost of the entries when removing an entry.
+   Assuming that there is only one entry with the lowest cost, for a given address on all the routers,
+   and updates are sent in a cacading manner to all the routes, we can assume that there cannot be a loop in the network,
+   going with the design principle of Distance Vector Routing algorithm.
+   
+   The addresses learnt from the rest of the connected hosts is sent to a connected host.
+   The routing update is also not sent to a connected host from whom we have just recieved the update, implementing the 
+   split horizon feature for avoiding loops in the routing updates.
+  
+   When the manager updates the cost of a link, router table entries holding information of links connected directly, is 
+   updated. We also update the cost to all of the addresses learnt via that link, to which the cost is being updated.
+   We also reconsider all the directly connected link costs that are stored in the link table for reinsertion into the 
+   routing table, just in case the new costs are more than the directly connected link costs.
+
+   Link Table:
+   This table keeps record of the links and the costs to the neighbor, this is updated only from the messages from the manager.
+   That would be from at the time of initialisation and at the time of link cost change.
+
+4. The topologies used for the protocols were 
+   1. Single line connected topology with all connected nodes. 
+      No issues seen with the increase of cost, removal of link, readdition of link.
+   
+   2. Routers connected in a circle
+      The costs were correctly learnt to take the shortest path.
+      On one link being cut, the paths were correclty learnt to reach all the neighbors
+   3. Non partitioned to partitioned network
+      The initial convergence of path was correct, after partition, we saw that the correct
+      costs were sent, and the messages to the other partition were dropped at the origin.
+
+   4. Problems could occur:
+      The updates may not happen right away and few packets may treated wrongly based on the older state.
+      We have discovered genuine problem of when the cost changes from -1 to connected in rare cases when 
+      we no longer take the best path.
+
